@@ -339,10 +339,16 @@ router.get('/sfdc/attendance/by-meeting', async (req, res, next) => {
           } catch (_e) {}
         }
       }
-      hashgacha = rawHash.map(r => ({
-        ...r,
-        studentName: r.studentId && contactIdToName2.has(r.studentId) ? contactIdToName2.get(r.studentId) : undefined
-      }));
+      hashgacha = rawHash.map(r => {
+        const rawSid = r.studentId;
+        const studentName = rawSid && contactIdToName2.has(rawSid) ? contactIdToName2.get(rawSid) : undefined;
+        const trimmedId = typeof rawSid === 'string' && rawSid.length > 15 ? rawSid.slice(0, 15) : rawSid;
+        return {
+          ...r,
+          studentId: trimmedId,
+          studentName
+        };
+      });
     } catch (_e) {
       hashgacha = [];
     }
