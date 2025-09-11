@@ -7,9 +7,17 @@ Node.js + Express server with JSforce to connect to Salesforce.
 - A Salesforce Connected App (for OAuth) or API-enabled user (for username/password)
 
 ### Setup
-1. Copy environment file:
+1. Create a `.env` file with at least:
    ```bash
-   cp .env.example .env
+   PORT=3000
+   SESSION_SECRET=replace-me
+   API_BEARER_TOKEN=replace-with-random-secret
+   # Salesforce creds
+   SF_LOGIN_URL=https://login.salesforce.com
+   SF_USERNAME=
+   SF_PASSWORD=
+   SF_SECURITY_TOKEN=
+   SF_API_VERSION=61.0
    ```
 2. Fill in the Salesforce values in `.env`:
    - `SF_CLIENT_ID`, `SF_CLIENT_SECRET`, `SF_CALLBACK_URL` for OAuth
@@ -24,7 +32,7 @@ Node.js + Express server with JSforce to connect to Salesforce.
    ```
 
 ### Endpoints
-- `GET /health` — health check
+- `GET /health` — health check (requires Authorization header)
 - OAuth flow:
   - `GET /api/auth/login` — redirect to Salesforce login
   - `GET /api/auth/callback` — OAuth callback; returns `userInfo`
@@ -40,6 +48,7 @@ Node.js + Express server with JSforce to connect to Salesforce.
 - In production, set `SESSION_SECRET` and use HTTPS; `secure` cookies are enabled when `NODE_ENV=production`.
 - To use a Sandbox, set `SF_LOGIN_URL=https://test.salesforce.com`.
 - You can pin `SF_API_VERSION` (default is in `.env.example`).
+ - All endpoints require header: `Authorization: Bearer $API_BEARER_TOKEN`
 
 ### Scripts
 - `npm start` – run server

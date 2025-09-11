@@ -33,6 +33,16 @@ app.use(
   })
 );
 
+// Bearer token auth middleware
+app.use((req, res, next) => {
+  const expected = (process.env.API_BEARER_TOKEN || '').trim();
+  if (!expected) return res.status(500).json({ error: 'Server misconfigured: API_BEARER_TOKEN is not set' });
+  const auth = req.headers.authorization || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  if (token && token === expected) return next();
+  return res.status(401).json({ error: 'Unauthorized' });
+});
+
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
