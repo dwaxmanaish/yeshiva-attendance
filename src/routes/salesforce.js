@@ -298,11 +298,61 @@ router.get('/sfdc/attendance/by-meeting', async (req, res, next) => {
       attendance = r.records.map(rec => ({ id: rec.Id }));
     }
 
+    // Hashgacha records for this meeting
+    let hashgacha = [];
+    try {
+      const hashSoql = `SELECT Id, Name, Student__c, Hashgacha_Rating__c, Hashgacha_Notes__c FROM Yeshiva_Hashgacha__c WHERE Class_Meeting__c = '${meeting.id}'`;
+      const hr = await runQuery(conn, hashSoql);
+      const anchorRe = /<a[^>]*href=["']\/(003[0-9A-Za-z]{12}(?:[0-9A-Za-z]{3})?)["'][^>]*>([^<]+)<\/a>/i;
+      const contactIdRegex = /^003[0-9A-Za-z]{12}(?:[0-9A-Za-z]{3})?$/;
+      const rawHash = (hr.records || []).map(rec => {
+        let sid;
+        const raw = rec.Student__c;
+        if (typeof raw === 'string') {
+          const m = raw.match(anchorRe);
+          if (m) sid = m[1];
+          else if (contactIdRegex.test(raw)) sid = raw;
+        }
+        return {
+          id: rec.Id,
+          name: rec.Name,
+          studentId: sid,
+          rating: rec.Hashgacha_Rating__c,
+          notes: rec.Hashgacha_Notes__c
+        };
+      });
+
+      // Resolve Contact names for hashgacha
+      const hashIds = Array.from(new Set(rawHash.map(r => r.studentId).filter(Boolean)));
+      const contactIdToName2 = new Map();
+      if (hashIds.length > 0) {
+        const chunkSize2 = 100;
+        for (let i = 0; i < hashIds.length; i += chunkSize2) {
+          const chunk = hashIds.slice(i, i + chunkSize2);
+          const idsList = chunk.map(id => `'${id}'`).join(',');
+          const q = `SELECT Id, Name FROM Contact WHERE Id IN (${idsList})`;
+          try {
+            const cr = await runQuery(conn, q);
+            for (const c of cr.records || []) {
+              contactIdToName2.set(c.Id, c.Name);
+            }
+          } catch (_e) {}
+        }
+      }
+      hashgacha = rawHash.map(r => ({
+        ...r,
+        studentName: r.studentId && contactIdToName2.has(r.studentId) ? contactIdToName2.get(r.studentId) : undefined
+      }));
+    } catch (_e) {
+      hashgacha = [];
+    }
+
     res.json({
       classId,
       start,
       meeting,
-      attendance
+      attendance,
+      hashgacha
     });
   } catch (err) {
     next(err);
