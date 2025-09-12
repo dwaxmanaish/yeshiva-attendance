@@ -364,3 +364,135 @@ router.get('/sfdc/attendance/by-meeting', async (req, res, next) => {
     next(err);
   }
 });
+
+// Update attendance and hashgacha for a class meeting
+router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
+  try {
+    const meetingId = typeof req.body.meetingId === 'string' ? req.body.meetingId.trim() : '';
+    if (!meetingId) return res.status(400).json({ error: 'meetingId is required' });
+
+    const { ensureConnection } = await import('../utils/salesforce.js');
+    const conn = await ensureConnection(req.session);
+
+    // Verify meeting exists
+    const mr = await runQuery(conn, `SELECT Id FROM Yeshiva_Class_Meeting__c WHERE Id='${meetingId}' LIMIT 1`);
+    if (!mr || mr.totalSize === 0) return res.status(404).json({ error: 'Class meeting not found', meetingId });
+
+    const attendanceItems = Array.isArray(req.body.attendance) ? req.body.attendance : [];
+    const hashgachaItems = Array.isArray(req.body.hashgacha) ? req.body.hashgacha : [];
+
+    const normalizeContact15 = (id) => {
+      if (typeof id !== 'string') return undefined;
+      const trimmed = id.trim();
+      if (!trimmed) return undefined;
+      return trimmed.length > 15 ? trimmed.slice(0, 15) : trimmed;
+    };
+
+    const results = { attendance: { updated: 0, failed: 0, errors: [] }, hashgacha: { updated: 0, failed: 0, errors: [] } };
+
+    // Attendance updates (Yeshiva_Attendance__c)
+    if (attendanceItems.length > 0) {
+      // Build records to update; prefer id, else lookup by studentId + meeting
+      const toUpdateById = [];
+      const toLookup = [];
+      for (const item of attendanceItems) {
+        const id = typeof item.id === 'string' ? item.id.trim() : '';
+        const studentId = normalizeContact15(item.studentId);
+        const fields = {};
+        if (typeof item.status === 'string') fields.Status__c = item.status;
+        if (typeof item.comments === 'string') fields.Notes__c = item.comments;
+        if (id) {
+          toUpdateById.push({ Id: id, ...fields });
+        } else if (studentId) {
+          toLookup.push({ studentId, fields });
+        }
+      }
+
+      // Batch update by Id
+      if (toUpdateById.length > 0) {
+        try {
+          const resu = await conn.sobject('Yeshiva_Attendance__c').update(toUpdateById, { allOrNone: false });
+          resu.forEach((r, idx) => {
+            if (r.success) results.attendance.updated += 1; else results.attendance.failed += 1;
+            if (!r.success) results.attendance.errors.push({ id: toUpdateById[idx].Id, message: r.errors?.join(', ') });
+          });
+        } catch (e) {
+          results.attendance.failed += toUpdateById.length;
+          results.attendance.errors.push({ message: String(e?.message || e) });
+        }
+      }
+
+      // Lookup by (meeting, student) then update
+      for (const pending of toLookup) {
+        try {
+          const q = `SELECT Id FROM Yeshiva_Attendance__c WHERE Class_Meeting__c='${meetingId}' AND Student__c LIKE '${pending.studentId}%' LIMIT 1`;
+          const r = await runQuery(conn, q);
+          if (r.totalSize > 0) {
+            const recId = r.records[0].Id;
+            const upd = await conn.sobject('Yeshiva_Attendance__c').update({ Id: recId, ...pending.fields });
+            if (upd.success) results.attendance.updated += 1; else {
+              results.attendance.failed += 1; results.attendance.errors.push({ id: recId, message: upd.errors?.join(', ') });
+            }
+          } else {
+            results.attendance.failed += 1; results.attendance.errors.push({ message: `Attendance not found for student ${pending.studentId}` });
+          }
+        } catch (e) {
+          results.attendance.failed += 1; results.attendance.errors.push({ message: String(e?.message || e) });
+        }
+      }
+    }
+
+    // Hashgacha updates (Yeshiva_Hashgacha__c)
+    if (hashgachaItems.length > 0) {
+      const toUpdateByIdH = [];
+      const toLookupH = [];
+      for (const item of hashgachaItems) {
+        const id = typeof item.id === 'string' ? item.id.trim() : '';
+        const studentId = normalizeContact15(item.studentId);
+        const fields = {};
+        if (typeof item.rating === 'string') fields.Hashgacha_Rating__c = item.rating;
+        if (typeof item.notes === 'string') fields.Hashgacha_Notes__c = item.notes;
+        if (id) {
+          toUpdateByIdH.push({ Id: id, ...fields });
+        } else if (studentId) {
+          toLookupH.push({ studentId, fields });
+        }
+      }
+
+      if (toUpdateByIdH.length > 0) {
+        try {
+          const resu = await conn.sobject('Yeshiva_Hashgacha__c').update(toUpdateByIdH, { allOrNone: false });
+          resu.forEach((r, idx) => {
+            if (r.success) results.hashgacha.updated += 1; else results.hashgacha.failed += 1;
+            if (!r.success) results.hashgacha.errors.push({ id: toUpdateByIdH[idx].Id, message: r.errors?.join(', ') });
+          });
+        } catch (e) {
+          results.hashgacha.failed += toUpdateByIdH.length;
+          results.hashgacha.errors.push({ message: String(e?.message || e) });
+        }
+      }
+
+      for (const pending of toLookupH) {
+        try {
+          const q = `SELECT Id FROM Yeshiva_Hashgacha__c WHERE Class_Meeting__c='${meetingId}' AND Student__c LIKE '${pending.studentId}%' LIMIT 1`;
+          const r = await runQuery(conn, q);
+          if (r.totalSize > 0) {
+            const recId = r.records[0].Id;
+            const upd = await conn.sobject('Yeshiva_Hashgacha__c').update({ Id: recId, ...pending.fields });
+            if (upd.success) results.hashgacha.updated += 1; else {
+              results.hashgacha.failed += 1; results.hashgacha.errors.push({ id: recId, message: upd.errors?.join(', ') });
+            }
+          } else {
+            results.hashgacha.failed += 1; results.hashgacha.errors.push({ message: `Hashgacha not found for student ${pending.studentId}` });
+          }
+        } catch (e) {
+          results.hashgacha.failed += 1; results.hashgacha.errors.push({ message: String(e?.message || e) });
+        }
+      }
+    }
+
+    res.json({ meeting: { id: meetingId }, results });
+  } catch (err) {
+    next(err);
+  }
+});
