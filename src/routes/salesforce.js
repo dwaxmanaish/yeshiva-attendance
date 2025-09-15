@@ -400,7 +400,7 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
         const studentId = normalizeContact15(item.studentId);
         const fields = {};
         if (typeof item.status === 'string') fields.Status__c = item.status;
-        if (typeof item.comments === 'string') fields.Notes__c = item.comments;
+        if (typeof item.comments === 'string') fields.Comments__c = item.comments;
         if (id) {
           toUpdateById.push({ Id: id, ...fields });
         } else if (studentId) {
@@ -414,11 +414,11 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
           const resu = await conn.sobject('Yeshiva_Attendance__c').update(toUpdateById, { allOrNone: false });
           resu.forEach((r, idx) => {
             if (r.success) results.attendance.updated += 1; else results.attendance.failed += 1;
-            if (!r.success) results.attendance.errors.push({ id: toUpdateById[idx].Id, message: r.errors?.join(', ') });
+            if (!r.success) results.attendance.errors.push({ id: toUpdateById[idx].Id, message: JSON.stringify(r.errors) });
           });
         } catch (e) {
           results.attendance.failed += toUpdateById.length;
-          results.attendance.errors.push({ message: String(e?.message || e) });
+          results.attendance.errors.push({ message: e?.message || JSON.stringify(e) });
         }
       }
 
@@ -431,13 +431,13 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
             const recId = r.records[0].Id;
             const upd = await conn.sobject('Yeshiva_Attendance__c').update({ Id: recId, ...pending.fields });
             if (upd.success) results.attendance.updated += 1; else {
-              results.attendance.failed += 1; results.attendance.errors.push({ id: recId, message: upd.errors?.join(', ') });
+              results.attendance.failed += 1; results.attendance.errors.push({ id: recId, message: JSON.stringify(upd.errors) });
             }
           } else {
             results.attendance.failed += 1; results.attendance.errors.push({ message: `Attendance not found for student ${pending.studentId}` });
           }
         } catch (e) {
-          results.attendance.failed += 1; results.attendance.errors.push({ message: String(e?.message || e) });
+          results.attendance.failed += 1; results.attendance.errors.push({ message: e?.message || JSON.stringify(e) });
         }
       }
     }
@@ -464,11 +464,11 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
           const resu = await conn.sobject('Yeshiva_Hashgacha__c').update(toUpdateByIdH, { allOrNone: false });
           resu.forEach((r, idx) => {
             if (r.success) results.hashgacha.updated += 1; else results.hashgacha.failed += 1;
-            if (!r.success) results.hashgacha.errors.push({ id: toUpdateByIdH[idx].Id, message: r.errors?.join(', ') });
+            if (!r.success) results.hashgacha.errors.push({ id: toUpdateByIdH[idx].Id, message: JSON.stringify(r.errors) });
           });
         } catch (e) {
           results.hashgacha.failed += toUpdateByIdH.length;
-          results.hashgacha.errors.push({ message: String(e?.message || e) });
+          results.hashgacha.errors.push({ message: e?.message || JSON.stringify(e) });
         }
       }
 
@@ -480,13 +480,13 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
             const recId = r.records[0].Id;
             const upd = await conn.sobject('Yeshiva_Hashgacha__c').update({ Id: recId, ...pending.fields });
             if (upd.success) results.hashgacha.updated += 1; else {
-              results.hashgacha.failed += 1; results.hashgacha.errors.push({ id: recId, message: upd.errors?.join(', ') });
+              results.hashgacha.failed += 1; results.hashgacha.errors.push({ id: recId, message: JSON.stringify(upd.errors) });
             }
           } else {
             results.hashgacha.failed += 1; results.hashgacha.errors.push({ message: `Hashgacha not found for student ${pending.studentId}` });
           }
         } catch (e) {
-          results.hashgacha.failed += 1; results.hashgacha.errors.push({ message: String(e?.message || e) });
+          results.hashgacha.failed += 1; results.hashgacha.errors.push({ message: e?.message || JSON.stringify(e) });
         }
       }
     }
