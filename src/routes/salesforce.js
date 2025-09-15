@@ -125,7 +125,7 @@ router.get('/sfdc/teachers/by-year', async (req, res, next) => {
 });
 
 // Attendance by class meeting: provide classId and start date to locate meeting
-router.get('/sfdc/attendance/by-meeting', async (req, res, next) => {
+router.get('/sfdc/class-meeting', async (req, res, next) => {
   try {
     const meetingIdOverride = typeof req.query.meetingId === 'string' ? req.query.meetingId.trim() : '';
     const classId = typeof req.query.classId === 'string' ? req.query.classId.trim() : '';
