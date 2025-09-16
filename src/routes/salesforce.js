@@ -519,3 +519,37 @@ router.post('/sfdc/notify/class-email', async (req, res, next) => {
   }
 });
 
+// Set attendance override on a class meeting
+router.post('/sfdc/attendance-override', async (req, res, next) => {
+  try {
+    const classMeeting = typeof req.body.classMeeting === 'string' ? req.body.classMeeting.trim() : '';
+    const override = typeof req.body.override === 'boolean' ? req.body.override : req.body.override === 'true';
+    const reason = typeof req.body.reason === 'string' ? req.body.reason.trim() : '';
+    if (!classMeeting) return res.status(400).json({ error: 'classMeeting is required' });
+    if (typeof override !== 'boolean') return res.status(400).json({ error: 'override must be boolean' });
+
+    const { ensureConnection } = await import('../utils/salesforce.js');
+    const conn = await ensureConnection(req.session);
+
+    // Verify class meeting exists
+    const found = await runQuery(conn, `SELECT Id FROM Yeshiva_Class_Meeting__c WHERE Id='${classMeeting}' LIMIT 1`);
+    if (!found || found.totalSize === 0) {
+      return res.status(404).json({ error: 'Class meeting not found', classMeeting });
+    }
+
+    const updateRes = await conn.sobject('Yeshiva_Class_Meeting__c').update({
+      Id: classMeeting,
+      Attendance_Requirement_Override__c: override,
+      Attendance_Override_Reason__c: reason || null
+    });
+
+    if (!updateRes || updateRes.success !== true) {
+      return res.status(502).json({ error: 'Update failed', details: updateRes?.errors || updateRes });
+    }
+
+    return res.json({ ok: true, id: classMeeting, override, reason });
+  } catch (err) {
+    next(err);
+  }
+});
+
