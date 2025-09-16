@@ -501,12 +501,12 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
 // Send class email notification via Mailgun
 router.post('/sfdc/notify/class-email', async (req, res, next) => {
   try {
-    const to = typeof req.body.to === 'string' ? req.body.to.trim() : '';
+    const to = (typeof req.body.to === 'string' ? req.body.to.trim() : '') || 'dwaxman@aish.edu';
     const className = typeof req.body.className === 'string' ? req.body.className.trim() : '';
     const teacherName = typeof req.body.teacherName === 'string' ? req.body.teacherName.trim() : '';
     const studentName = typeof req.body.studentName === 'string' ? req.body.studentName.trim() : '';
-    if (!to || !className || !teacherName || !studentName) {
-      return res.status(400).json({ error: 'to, className, teacherName, studentName are required' });
+    if (!className || !teacherName || !studentName) {
+      return res.status(400).json({ error: 'className, teacherName, studentName are required' });
     }
     const resp = await sendClassEmail({ to, className, teacherName, studentName });
     res.json({ ok: true, id: resp?.id || resp?.message || 'sent' });
