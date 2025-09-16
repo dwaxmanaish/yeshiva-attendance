@@ -7,6 +7,7 @@ import {
   identity,
   runQuery
 } from '../utils/salesforce.js';
+import { sendClassEmail } from '../utils/mailgun.js';
 
 const router = express.Router();
 
@@ -496,3 +497,25 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
     next(err);
   }
 });
+
+// Send class email notification via Mailgun
+router.post('/sfdc/notify/class-email', async (req, res, next) => {
+  try {
+    const to = typeof req.body.to === 'string' ? req.body.to.trim() : '';
+    const className = typeof req.body.className === 'string' ? req.body.className.trim() : '';
+    const teacherName = typeof req.body.teacherName === 'string' ? req.body.teacherName.trim() : '';
+    const studentName = typeof req.body.studentName === 'string' ? req.body.studentName.trim() : '';
+    if (!to || !className || !teacherName || !studentName) {
+      return res.status(400).json({ error: 'to, className, teacherName, studentName are required' });
+    }
+    const resp = await sendClassEmail({ to, className, teacherName, studentName });
+    res.json({ ok: true, id: resp?.id || resp?.message || 'sent' });
+  } catch (err) {
+    return res.status(mgStatus ? 502 : 500).json({
+      error: mgStatus ? 'Mailgun error' : 'Server error',
+      mailgunStatus: mgStatus || undefined,
+      details: mgDetails
+    });
+  }
+});
+
