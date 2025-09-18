@@ -316,9 +316,13 @@ router.get('/sfdc/class-meeting', async (req, res, next) => {
 
     // Hashgacha records for this meeting
     let hashgacha = [];
+    
     try {
       const hashSoql = `SELECT Id, Name, Student__c, Hashgacha_Rating__c, Hashgacha_Notes__c FROM Yeshiva_Hashgacha__c WHERE Class_Meeting__c = '${meeting.id}'`;
+      console.log('Hashgacha SOQL:', hashSoql);
       const hr = await runQuery(conn, hashSoql);
+      console.log('Hashgacha result - totalSize:', hr.totalSize, 'records:', hr.records);
+      
       const anchorRe = /<a[^>]*href=["']\/(003[0-9A-Za-z]{12}(?:[0-9A-Za-z]{3})?)["'][^>]*>([^<]+)<\/a>/i;
       const contactIdRegex = /^003[0-9A-Za-z]{12}(?:[0-9A-Za-z]{3})?$/;
       const rawHash = (hr.records || []).map(rec => {
@@ -365,7 +369,8 @@ router.get('/sfdc/class-meeting', async (req, res, next) => {
           studentName
         };
       });
-    } catch (_e) {
+    } catch (e) {
+      console.log('Hashgacha query failed:', e.message);
       hashgacha = [];
     }
 
