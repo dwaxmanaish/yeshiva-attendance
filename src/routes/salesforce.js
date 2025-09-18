@@ -160,17 +160,27 @@ router.get('/sfdc/class-meeting', async (req, res, next) => {
     let meetingInfo = null;
     if (meetingIdOverride) {
       // Direct meeting lookup
-      const r = await runQuery(conn, `SELECT Id, Name FROM Yeshiva_Class_Meeting__c WHERE Id = '${meetingIdOverride}' LIMIT 1`);
-      meeting = r.totalSize > 0 ? { id: r.records[0].Id, name: r.records[0].Name } : null;
+      const r = await runQuery(conn, `SELECT Id, Name, Class__r.Name, Teacher__r.Name FROM Yeshiva_Class_Meeting__c WHERE Id = '${meetingIdOverride}' LIMIT 1`);
+      meeting = r.totalSize > 0 ? { 
+        id: r.records[0].Id, 
+        name: r.records[0].Name,
+        className: r.records[0].Class__r?.Name,
+        teacher: r.records[0].Teacher__r?.Name
+      } : null;
       usedMeetingFields = { via: 'meetingId' };
     } else {
       // First try exact field names per spec
       if (classId && start) {
-        const exactSoql = `SELECT Id, Name FROM Yeshiva_Class_Meeting__c WHERE Yeshiva_Classes__c = '${classId}' AND Class_Start_Date__c = ${start} LIMIT 1`;
+        const exactSoql = `SELECT Id, Name, Class__r.Name, Teacher__r.Name FROM Yeshiva_Class_Meeting__c WHERE Yeshiva_Classes__c = '${classId}' AND Class_Start_Date__c = ${start} LIMIT 1`;
         try {
           const r = await runQuery(conn, exactSoql);
           if (r.totalSize > 0) {
-            meeting = { id: r.records[0].Id, name: r.records[0].Name };
+            meeting = { 
+              id: r.records[0].Id, 
+              name: r.records[0].Name,
+              className: r.records[0].Class__r?.Name,
+              teacher: r.records[0].Teacher__r?.Name
+            };
             usedMeetingFields = { classField: 'Yeshiva_Classes__c', dateField: 'Class_Start_Date__c', dateType: 'date', via: 'exact' };
           }
         } catch (_e) {
@@ -194,9 +204,14 @@ router.get('/sfdc/class-meeting', async (req, res, next) => {
           ? `DAY_ONLY(${dateFieldName}) = ${start}`
           : `${dateFieldName} = ${start}`;
 
-        const meetingSoql = `SELECT Id, Name FROM ${discovered.objectName} WHERE ${classFieldName} = '${classId}' AND ${datePredicate} LIMIT 1`;
+        const meetingSoql = `SELECT Id, Name, Class__r.Name, Teacher__r.Name FROM ${discovered.objectName} WHERE ${classFieldName} = '${classId}' AND ${datePredicate} LIMIT 1`;
         const meetingResp = await runQuery(conn, meetingSoql);
-        meeting = meetingResp.totalSize > 0 ? { id: meetingResp.records[0].Id, name: meetingResp.records[0].Name } : null;
+        meeting = meetingResp.totalSize > 0 ? { 
+          id: meetingResp.records[0].Id, 
+          name: meetingResp.records[0].Name,
+          className: meetingResp.records[0].Class__r?.Name,
+          teacher: meetingResp.records[0].Teacher__r?.Name
+        } : null;
         usedMeetingFields = { classField: classFieldName, dateField: dateFieldName, dateType: dateFieldType, via: 'discovered' };
       }
     }
@@ -356,6 +371,8 @@ router.get('/sfdc/class-meeting', async (req, res, next) => {
 
     res.json({
       classId,
+      className: meeting?.className,
+      teacher: meeting?.teacher,
       start,
       meeting,
       attendance,
