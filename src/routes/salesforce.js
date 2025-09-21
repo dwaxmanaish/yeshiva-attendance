@@ -419,7 +419,7 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
       const toUpdateById = [];
       const toLookup = [];
       for (const item of attendanceItems) {
-        const id = typeof item.id === 'string' ? item.id.trim() : '';
+        const id = typeof item.studentId === 'string' ? item.studentId.trim() : '';
         const studentId = normalizeContact15(item.studentId);
         const fields = {};
         if (typeof item.status === 'string') fields.Status__c = item.status;
@@ -470,7 +470,7 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
       const toUpdateByIdH = [];
       const toLookupH = [];
       for (const item of hashgachaItems) {
-        const id = typeof item.id === 'string' ? item.id.trim() : '';
+        const id = typeof item.studentId === 'string' ? item.studentId.trim() : '';
         const studentId = normalizeContact15(item.studentId);
         const fields = {};
         if (typeof item.rating === 'string') fields.Hashgacha_Rating__c = item.rating;
