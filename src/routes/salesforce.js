@@ -415,19 +415,14 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
 
     // Attendance updates (Yeshiva_Attendance__c)
     if (attendanceItems.length > 0) {
-      // Build records to update; prefer id, else lookup by studentId + meeting
       const toUpdateById = [];
-      const toLookup = [];
       for (const item of attendanceItems) {
-        const id = typeof item.studentId === 'string' ? item.studentId.trim() : '';
-        const studentId = normalizeContact15(item.studentId);
+        const id = typeof item.id === 'string' ? item.id.trim() : '';
         const fields = {};
         if (typeof item.status === 'string') fields.Status__c = item.status;
         if (typeof item.comments === 'string') fields.Comments__c = item.comments;
         if (id) {
           toUpdateById.push({ Id: id, ...fields });
-        } else if (studentId) {
-          toLookup.push({ studentId, fields });
         }
       }
 
@@ -445,40 +440,18 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
         }
       }
 
-      // Lookup by (meeting, student) then update
-      for (const pending of toLookup) {
-        try {
-          const q = `SELECT Id FROM Yeshiva_Attendance__c WHERE Class_Meeting__c='${meetingId}' AND Student__c LIKE '${pending.studentId}%' LIMIT 1`;
-          const r = await runQuery(conn, q);
-          if (r.totalSize > 0) {
-            const recId = r.records[0].Id;
-            const upd = await conn.sobject('Yeshiva_Attendance__c').update({ Id: recId, ...pending.fields });
-            if (upd.success) results.attendance.updated += 1; else {
-              results.attendance.failed += 1; results.attendance.errors.push({ id: recId, message: JSON.stringify(upd.errors) });
-            }
-          } else {
-            results.attendance.failed += 1; results.attendance.errors.push({ message: `Attendance not found for student ${pending.studentId}` });
-          }
-        } catch (e) {
-          results.attendance.failed += 1; results.attendance.errors.push({ message: e?.message || JSON.stringify(e) });
-        }
-      }
     }
 
     // Hashgacha updates (Yeshiva_Hashgacha__c)
     if (hashgachaItems.length > 0) {
       const toUpdateByIdH = [];
-      const toLookupH = [];
       for (const item of hashgachaItems) {
-        const id = typeof item.studentId === 'string' ? item.studentId.trim() : '';
-        const studentId = normalizeContact15(item.studentId);
+        const id = typeof item.id === 'string' ? item.id.trim() : '';
         const fields = {};
         if (typeof item.rating === 'string') fields.Hashgacha_Rating__c = item.rating;
         if (typeof item.notes === 'string') fields.Hashgacha_Notes__c = item.notes;
         if (id) {
           toUpdateByIdH.push({ Id: id, ...fields });
-        } else if (studentId) {
-          toLookupH.push({ studentId, fields });
         }
       }
 
@@ -495,23 +468,6 @@ router.post('/sfdc/attendance/class-meeting', async (req, res, next) => {
         }
       }
 
-      for (const pending of toLookupH) {
-        try {
-          const q = `SELECT Id FROM Yeshiva_Hashgacha__c WHERE Class_Meeting__c='${meetingId}' AND Student__c LIKE '${pending.studentId}%' LIMIT 1`;
-          const r = await runQuery(conn, q);
-          if (r.totalSize > 0) {
-            const recId = r.records[0].Id;
-            const upd = await conn.sobject('Yeshiva_Hashgacha__c').update({ Id: recId, ...pending.fields });
-            if (upd.success) results.hashgacha.updated += 1; else {
-              results.hashgacha.failed += 1; results.hashgacha.errors.push({ id: recId, message: JSON.stringify(upd.errors) });
-            }
-          } else {
-            results.hashgacha.failed += 1; results.hashgacha.errors.push({ message: `Hashgacha not found for student ${pending.studentId}` });
-          }
-        } catch (e) {
-          results.hashgacha.failed += 1; results.hashgacha.errors.push({ message: e?.message || JSON.stringify(e) });
-        }
-      }
     }
 
     res.json({ meeting: { id: meetingId }, results });
